@@ -42,6 +42,8 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	go c.write()
+	// Sync tiki content
+	c.send <- []byte(p.Tiki.Content)
 	c.read()
 }
 

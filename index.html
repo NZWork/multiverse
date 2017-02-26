@@ -7,73 +7,108 @@
          var sock = null;
          var wsuri = "ws://"+ document.location.host + "/sync";
 
-         function connect() {
-             let tid = $('#tid').val();
-             let name = $('#n').val();
+         var send = 0;
+         var lastMsg = 0;
+         var didClose = false;
+         var typing = false;
 
-             if (tid.length == 0 || name.length == 0) {
-                 alert("tid and name could not be empty");
+         var ver = 0;
+
+         function disconnect() {
+             didClose = true;
+             sock.close()
+
+             $('#cb').attr("disabled", false);
+             $('#db').attr("disabled", true);
+             $('#main').attr("readonly", true);
+
+         }
+
+         function connect() {
+             let token = $('#token').val();
+
+             if (token.length == 0) {
+                 alert("token could not be empty");
                  return
              }
-             wsuri = wsuri + "?token=" + tid;
-             wsuri = wsuri + "&name=" + name;
-             console.log(wsuri);
+             wsuri = wsuri + "?token=" + token;
 
              sock = new WebSocket(wsuri);
              console.log("connect with sync");
-             sync();
-         }
-
-         function sync() {
-
-             console.log("onload");
 
              sock.onopen = function() {
                  console.log("connected to " + wsuri);
              }
 
              sock.onclose = function(e) {
+                 didClose = true;
                  console.log("connection closed (" + e.code + ")");
              }
 
              sock.onmessage = function(e) {
-                 msg = e.data + Date.now() + "]";
-                 $('#console').append("<li>" + msg + "</li>");
-                 console.log("message received: " + msg);
+                 console.log("message received: " + e.data);
+                 recieve(e.data);
              }
+
+             $('#cb').attr("disabled", true);
+             $('#db').attr("disabled", false);
+             $('#main').attr("readonly", false);
+
+             //setInterval("sync()",3000);
          };
 
 
-         function send() {
-             if (sock == undefined) {
-                 alert("connect to sync center firstly");
+         function recieve(msg) {
+             $('#timing').html(Date.now() - send);
+             $('#main').val(msg);
+         }
+
+         function sendToSync(v) {
+             if (didClose) {
                  return
              }
-             var msg = $('#message').val();
-             msg = $('#n').val() + ": " + msg;
-             msg = msg + " [sent => " + Date.now() + ", recieve => ";
-             console.info("send: " + msg);
-             sock.send(msg);
-         };
+
+             if (typing) {
+                 console.log("try to send but typing");
+                 return;
+             }
+
+             if (sock == undefined) {
+                 console.log("connect to sync center firstly");
+                 return
+             }
+
+             var msg = $('#main').val();
+             if (v == ver) {
+                 console.log("send: " + msg);
+                 send = Date.now();
+                 sock.send(msg);
+             }
+         }
+
+         function xkeydown() {
+             typing = true;
+             console.log("typing");
+         }
+
+         function xkeyup() {
+             console.log("key up");
+             typing = false;
+             ver++;
+             setTimeout("sendToSync("+ver+")", 1777);
+         }
+
         </script>
         <h1>Tiki Sync Service Test</h1>
+        <p><span id="timing">0</span>ms</p>
         <form>
             <p>
-                TID <input id="tid" type="text">
-                Name <input id="n" type="text">
-                <button type="button" onclick="connect();">Connect</button>
+                Token <input id="token" type="text">
+                <button type="button" onclick="connect();" id="cb">Connect</button>
+                <button type="button" onclick="disconnect();" id="db" disabled>Disconnect</button>
 
-            </p>
-
-            <br>
-            <p>
-                Message: <textarea id="message" type="text" value="Hello, world!"></textarea>
             </p>
         </form>
-        <button onclick="send();">Send Message</button>
-
-        <div style="border: 1px solid #ddd;border-radius: 3px;">
-            <ul id="console"></ul>
-        </div>
+        <textarea id="main" style="border: 1px solid #ddd;border-radius: 3px;" cols="128" rows="32" onkeyup="xkeyup();" onkeydown="xkeydown();" readonly></textarea>
     </body>
 </html>

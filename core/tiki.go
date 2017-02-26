@@ -3,6 +3,7 @@ package core
 import (
 	//"errors"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	"log"
 	"sync"
 )
 
@@ -10,10 +11,10 @@ import (
 type Tiki struct {
 	TID     uint64
 	Title   []byte
-	Content []byte
+	Content string
 	Version uint64
 
-	diff *diffmatchpatch.DiffMatchPatch
+	dmp  *diffmatchpatch.DiffMatchPatch
 	lock sync.RWMutex
 }
 
@@ -21,7 +22,9 @@ type Tiki struct {
 func GetTikiByID(id uint64) (*Tiki, error) {
 	// Load tiki from storage service
 	return &Tiki{
-		diff: diffmatchpatch.New(),
+		dmp:     diffmatchpatch.New(),
+		Content: "",
+		Version: 0,
 	}, nil
 }
 
@@ -29,7 +32,19 @@ func GetTikiByID(id uint64) (*Tiki, error) {
 func GetTikiByToken(token string) (t *Tiki, err error) {
 	//err = errors.New("invalid token")
 	t = &Tiki{
-		TID: 233,
+		TID:     233,
+		dmp:     diffmatchpatch.New(),
+		Content: "",
+		Version: 0,
 	}
 	return
+}
+
+// Merge return merged content
+func (t *Tiki) Merge(latest string) {
+	diffs := t.dmp.DiffMain(t.Content, latest, true)
+	patches := t.dmp.PatchMake(t.Content, diffs)
+	t.Content, _ = t.dmp.PatchApply(patches, t.Content)
+	t.Version++
+	log.Println("merged")
 }
