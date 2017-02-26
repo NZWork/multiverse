@@ -1,0 +1,79 @@
+<html>
+    <head></head>
+    <body>
+        <script src="https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js"></script>
+
+        <script type="text/javascript">
+         var sock = null;
+         var wsuri = "ws://"+ document.location.host + "/sync";
+
+         function connect() {
+             let tid = $('#tid').val();
+             let name = $('#n').val();
+
+             if (tid.length == 0 || name.length == 0) {
+                 alert("tid and name could not be empty");
+                 return
+             }
+             wsuri = wsuri + "?token=" + tid;
+             wsuri = wsuri + "&name=" + name;
+             console.log(wsuri);
+
+             sock = new WebSocket(wsuri);
+             console.log("connect with sync");
+             sync();
+         }
+
+         function sync() {
+
+             console.log("onload");
+
+             sock.onopen = function() {
+                 console.log("connected to " + wsuri);
+             }
+
+             sock.onclose = function(e) {
+                 console.log("connection closed (" + e.code + ")");
+             }
+
+             sock.onmessage = function(e) {
+                 msg = e.data + Date.now() + "]";
+                 $('#console').append("<li>" + msg + "</li>");
+                 console.log("message received: " + msg);
+             }
+         };
+
+
+         function send() {
+             if (sock == undefined) {
+                 alert("connect to sync center firstly");
+                 return
+             }
+             var msg = $('#message').val();
+             msg = $('#n').val() + ": " + msg;
+             msg = msg + " [sent => " + Date.now() + ", recieve => ";
+             console.info("send: " + msg);
+             sock.send(msg);
+         };
+        </script>
+        <h1>Tiki Sync Service Test</h1>
+        <form>
+            <p>
+                TID <input id="tid" type="text">
+                Name <input id="n" type="text">
+                <button type="button" onclick="connect();">Connect</button>
+
+            </p>
+
+            <br>
+            <p>
+                Message: <textarea id="message" type="text" value="Hello, world!"></textarea>
+            </p>
+        </form>
+        <button onclick="send();">Send Message</button>
+
+        <div style="border: 1px solid #ddd;border-radius: 3px;">
+            <ul id="console"></ul>
+        </div>
+    </body>
+</html>
