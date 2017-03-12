@@ -1,10 +1,14 @@
 package core
 
 import (
+	//	"bytes"
 	"bytes"
-	"github.com/gorilla/websocket"
+	"fmt"
 	"log"
+	//	"log"
 	"time"
+
+	"github.com/gorilla/websocket"
 )
 
 const (
@@ -61,8 +65,10 @@ func (c *Client) read() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		c.playground.Tiki.Merge(string(message))
-		c.playground.broadcast <- []byte(c.playground.Tiki.Content)
+		fmt.Printf("receive: %s\n", message)
+		c.playground.broadcast <- []byte(message)
+		//c.playground.Tiki.Merge(string(message))
+		//c.playground.broadcast <- []byte(c.playground.Tiki.Content)
 	}
 }
 

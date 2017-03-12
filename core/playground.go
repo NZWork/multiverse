@@ -54,8 +54,8 @@ func (p *Playground) Run() {
 	for {
 		select {
 		case msg := <-p.broadcast:
+			fmt.Printf("broadcast: %s\n", msg)
 			for c := range p.Clients {
-				fmt.Println("broadcast")
 				// 消息发送
 				c.send <- msg
 			}

@@ -1,114 +1,30 @@
 <html>
-    <head></head>
-    <body>
-        <script src="https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js"></script>
 
-        <script type="text/javascript">
-         var sock = null;
-         var wsuri = "ws://"+ document.location.host + "/sync";
+<head>
+</head>
 
-         var send = 0;
-         var lastMsg = 0;
-         var didClose = false;
-         var typing = false;
+<body>
+    <script src="https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
 
-         var ver = 0;
-
-         function disconnect() {
-             didClose = true;
-             sock.close()
-
-             $('#cb').attr("disabled", false);
-             $('#db').attr("disabled", true);
-             $('#main').attr("readonly", true);
-
-         }
-
-         function connect() {
-             let token = $('#token').val();
-
-             if (token.length == 0) {
-                 alert("token could not be empty");
-                 return
-             }
-             wsuri = wsuri + "?token=" + token;
-
-             sock = new WebSocket(wsuri);
-             console.log("connect with sync");
-
-             sock.onopen = function() {
-                 console.log("connected to " + wsuri);
-             }
-
-             sock.onclose = function(e) {
-                 didClose = true;
-                 console.log("connection closed (" + e.code + ")");
-             }
-
-             sock.onmessage = function(e) {
-                 console.log("message received: " + e.data);
-                 recieve(e.data);
-             }
-
-             $('#cb').attr("disabled", true);
-             $('#db').attr("disabled", false);
-             $('#main').attr("readonly", false);
-
-             //setInterval("sync()",3000);
-         };
+    <script src="/ot.js"></script>
+    <script src="/util.js"></script>
+    <script src="/app.js"></script>
 
 
-         function recieve(msg) {
-             $('#timing').html(Date.now() - send);
-             $('#main').val(msg);
-         }
+    <h1>Tiki Sync Service Test</h1>
+    <p><span id="timing">0</span>ms</p>
+    <form>
+        <p>
+            Token <input id="token" type="text">
+            <button type="button" onclick="connect();" id="cb">Connect</button>
+            <button type="button" onclick="disconnect();" id="db" disabled>Disconnect</button>
 
-         function sendToSync(v) {
-             if (didClose) {
-                 return
-             }
+        </p>
+    </form>
 
-             if (typing) {
-                 console.log("try to send but typing");
-                 return;
-             }
+    <textarea id="main" onkeyup="sync()" cols="20" rows="20"></textarea>
 
-             if (sock == undefined) {
-                 console.log("connect to sync center firstly");
-                 return
-             }
+</body>
 
-             var msg = $('#main').val();
-             if (v == ver) {
-                 console.log("send: " + msg);
-                 send = Date.now();
-                 sock.send(msg);
-             }
-         }
-
-         function xkeydown() {
-             typing = true;
-             console.log("typing");
-         }
-
-         function xkeyup() {
-             console.log("key up");
-             typing = false;
-             ver++;
-             setTimeout("sendToSync("+ver+")", 1777);
-         }
-
-        </script>
-        <h1>Tiki Sync Service Test</h1>
-        <p><span id="timing">0</span>ms</p>
-        <form>
-            <p>
-                Token <input id="token" type="text">
-                <button type="button" onclick="connect();" id="cb">Connect</button>
-                <button type="button" onclick="disconnect();" id="db" disabled>Disconnect</button>
-
-            </p>
-        </form>
-        <textarea id="main" style="border: 1px solid #ddd;border-radius: 3px;" cols="128" rows="32" onkeyup="xkeyup();" onkeydown="xkeydown();" readonly></textarea>
-    </body>
 </html>
