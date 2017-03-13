@@ -3,6 +3,7 @@ var Changeset = ot.Changeset
 var engine = new diff_match_patch
 var his = ""
 var seq = 0
+var ver = 0
 
 // WS
 var conn = null
@@ -15,6 +16,10 @@ var lastMsg = 0
 var didClose = false
 var typing = false
 
+const OP_RETAIN = 0
+const OP_INSERT = 1
+const OP_DELETE = 2
+
 Object.prototype.getName = function() {
     var funcNameRegex = /function (.{1,})\(/
     var results = (funcNameRegex).exec((this).constructor.toString())
@@ -23,25 +28,33 @@ Object.prototype.getName = function() {
 
 //  Change 转换为 一个 JSON
 function changeToJSON(change) {
-    var ops = new Array()
     var data = new Object()
-    data['op'] = new Object()
+    data['op'] = new Array()
 
     var shouldSend = false
 
+    var last = change.length - 1
+
+    var addCursor, removeCursor = 0
+
     for (var i = 0; i < change.length; i++) {
         var op = change[i].getName()
-        if ($.inArray(op, ops) !== -1) {
-            break
-        }
-        ops.push(op)
+
         if (op == 'Retain') {
-            data['op']['retain'] = change[i].length
+            if (i == last) { // 最后一个retain扔掉
+                continue
+            }
+
+            data['op'].push({'type': OP_RETAIN, 'op': change[i].length})
         } else if (op == 'Insert') {
-            data['op']['insert'] = change.addendum
+            data['op'].push({'type': OP_INSERT, 'op': change.addendum.substring(addCursor, change[i]['length'])})
+            addCursor += change[i]['length'] // move cursor
+
             shouldSend = true
         } else if (op == 'Skip') {
-            data['op']['delete'] = change[i].length
+            data['op'].push({'type': OP_DELETE, 'op': change.removendum.substring(removeCursor, change[i]['length'])})
+            removeCursor += change[i]['length']
+
             shouldSend = true
         }
     }
@@ -49,6 +62,7 @@ function changeToJSON(change) {
         seq++
         data['seq'] = seq
         data['uid'] = uid
+        data['ver'] = ver
         return JSON.stringify(data)
     }
 }
@@ -60,6 +74,7 @@ function JSONToChange(json) {
     if (json == "") {
         return
     }
+
     data = JSON.parse(json)
     if (data.uid == uid) {
         return
@@ -71,22 +86,44 @@ function JSONToChange(json) {
 
     console.log('current ' + pos, obj.selectionStart)
 
-    if (data.op != undefined) {
-        if (data.op.retain != undefined) {
-            ops.push(new ot.Retain(data.op.retain))
-            if (data.op.retain < pos) {
-                console.log('drift')
-                cursorDrift = true
-            }
-        }
-        if (data.op.insert != undefined) {
-            ops.push(new ot.Insert(data.op.insert.length))
-            addendum += data.op.insert
-        }
-        if (data.op.delete != undefined) {
-            ops.push(new ot.Skip(data.op.delete))
+    for (var i = 0; i < data['op'].length; i++) {
+        var current = data['op'][i]
+
+        switch (current['type']) {
+            case OP_RETAIN:
+                ops.push(new ot.Retain(current.op))
+                if (current.op < pos) {
+                    console.log('drift')
+                    cursorDrift = true
+                }
+                break;
+            case OP_INSERT:
+                ops.push(new ot.Insert(current.op.length))
+                addendum += current.op
+                break;
+            case OP_DELETE:
+                ops.push(new ot.Skip(current.op.length))
+                break;
+            default:
         }
     }
+
+    // if (data.op != undefined) {
+    //     if (data.op.retain != undefined) {
+    //         ops.push(new ot.Retain(data.op.retain))
+    //         if (data.op.retain < pos) {
+    //             console.log('drift')
+    //             cursorDrift = true
+    //         }
+    //     }
+    //     if (data.op.insert != undefined) {
+    //         ops.push(new ot.Insert(data.op.insert.length))
+    //         addendum += data.op.insert
+    //     }
+    //     if (data.op.delete != undefined) {
+    //         ops.push(new ot.Skip(data.op.delete))
+    //     }
+    // }
     var change = new ot.Changeset(ops)
     change.addendum = addendum
 
@@ -121,7 +158,7 @@ function sync() {
 }
 
 function sendMsg(msg) {
-    console.log("send: " + msg + " seq: " + seq)
+    console.log("send: " + msg)
     send = Date.now()
     conn.send(msg)
 }

@@ -2,6 +2,7 @@ package core
 
 import (
 	"fmt"
+	"sync/core/ot"
 )
 
 // DebugSeperator for output
@@ -40,6 +41,7 @@ func NewPlayground(t *Tiki) (*Playground, error) {
 func (p *Playground) Join(c *Client) (ok bool, err error) {
 	p.Clients[c] = true
 	fmt.Printf("UID: %d join\n", c.UID)
+	//p.LoadTiki(c)
 	return true, nil
 }
 
@@ -47,6 +49,25 @@ func (p *Playground) Join(c *Client) (ok bool, err error) {
 func (p *Playground) Left(c *Client) {
 	fmt.Printf("UID: %d left\n", c.UID)
 	delete(p.Clients, c)
+}
+
+// LoadTiki when the client join
+// To sync the lag tiki
+func (p *Playground) LoadTiki(c *Client) {
+	msg := &SyncMessage{}
+	msg.UID = c.UID
+	msg.Version = p.Tiki.Version
+	msg.Sequence = 0
+	msg.OP = Operation{
+		Insert: ot.Insert{
+			Insert: p.Tiki.Content,
+		},
+	}
+	m, err := msg.ToJSON()
+	if err != nil {
+		panic(err)
+	}
+	c.send <- m
 }
 
 // Run goroutine handling A playground connections
