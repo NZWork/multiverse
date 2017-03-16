@@ -3,7 +3,6 @@ package core
 import (
 	//	"bytes"
 	"bytes"
-	"fmt"
 	"log"
 	//	"log"
 	"time"
@@ -65,7 +64,7 @@ func (c *Client) read() {
 			break
 		}
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
-		fmt.Printf("receive: %s\n", message)
+		log.Printf("receive: %s\n", message)
 		c.playground.broadcast <- []byte(message)
 		//c.playground.Tiki.Merge(string(message))
 		//c.playground.broadcast <- []byte(c.playground.Tiki.Content)

@@ -20,6 +20,11 @@ const OP_RETAIN = 0
 const OP_INSERT = 1
 const OP_DELETE = 2
 
+
+const OT_MSG = 0
+const ACK_MSG = 1
+const FORCE_SYNC_MSG = 2
+
 Object.prototype.getName = function() {
     var funcNameRegex = /function (.{1,})\(/
     var results = (funcNameRegex).exec((this).constructor.toString())
@@ -35,7 +40,7 @@ function changeToJSON(change) {
 
     var last = change.length - 1
 
-    var addCursor, removeCursor = 0
+    var addCursor = 0, removeCursor = 0
 
     for (var i = 0; i < change.length; i++) {
         var op = change[i].getName()
@@ -44,15 +49,14 @@ function changeToJSON(change) {
             if (i == last) { // 最后一个retain扔掉
                 continue
             }
-
             data['op'].push({'type': OP_RETAIN, 'op': change[i].length})
         } else if (op == 'Insert') {
-            data['op'].push({'type': OP_INSERT, 'op': change.addendum.substring(addCursor, change[i]['length'])})
+            data['op'].push({'type': OP_INSERT, 'op': change.addendum.substring(addCursor, addCursor+change[i]['length'])})
             addCursor += change[i]['length'] // move cursor
 
             shouldSend = true
         } else if (op == 'Skip') {
-            data['op'].push({'type': OP_DELETE, 'op': change.removendum.substring(removeCursor, change[i]['length'])})
+            data['op'].push({'type': OP_DELETE, 'op': change.removendum.substring(removeCursor, removeCursor+change[i]['length'])})
             removeCursor += change[i]['length']
 
             shouldSend = true
@@ -60,6 +64,7 @@ function changeToJSON(change) {
     }
     if (shouldSend) {
         seq++
+        data['type'] = OT_MSG
         data['seq'] = seq
         data['uid'] = uid
         data['ver'] = ver
@@ -76,15 +81,24 @@ function JSONToChange(json) {
     }
 
     data = JSON.parse(json)
-    if (data.uid == uid) {
-        return
-    }
 
     let obj = $('#main')
     let pos = getCaretPosition('main')
     let cursorDrift = false
 
-    console.log('current ' + pos, obj.selectionStart)
+    if (data['type'] == ACK_MSG) {
+        ver = data.ver
+        return
+    }
+
+    if (data['type'] == FORCE_SYNC_MSG) {
+        console.log('force sync')
+        // clean all the content
+        his = ''
+        obj.val('')
+    }
+
+    ver = data.ver
 
     for (var i = 0; i < data['op'].length; i++) {
         var current = data['op'][i]
@@ -108,22 +122,6 @@ function JSONToChange(json) {
         }
     }
 
-    // if (data.op != undefined) {
-    //     if (data.op.retain != undefined) {
-    //         ops.push(new ot.Retain(data.op.retain))
-    //         if (data.op.retain < pos) {
-    //             console.log('drift')
-    //             cursorDrift = true
-    //         }
-    //     }
-    //     if (data.op.insert != undefined) {
-    //         ops.push(new ot.Insert(data.op.insert.length))
-    //         addendum += data.op.insert
-    //     }
-    //     if (data.op.delete != undefined) {
-    //         ops.push(new ot.Skip(data.op.delete))
-    //     }
-    // }
     var change = new ot.Changeset(ops)
     change.addendum = addendum
 
@@ -166,13 +164,13 @@ function sendMsg(msg) {
 function connect() {
     let token = $('#token').val()
     if (token.length == 0) {
-        alert("token could not be empty")
+        alert("token invalid")
         return
     }
+    uid = Math.ceil(Math.random() * 1000)
 
-    conn = new WebSocket(target + "?token=" + token)
+    conn = new WebSocket(target + "?token=" + token + '&uid=' + uid)
     console.log("connect with sync")
-    uid = Math.random()
     conn.onopen = function() {
         console.log("connected to sync ")
     }
@@ -190,6 +188,11 @@ function connect() {
         }
         $('#main').val(moded.content)
         setCaretPosition('main', moded.pos)
+    }
+
+    conn.onclose = function() {
+        console.log('closed')
+        $('#main').attr('readonly', 'readonly')
     }
 
     $('#cb').attr("disabled", true)

@@ -1,7 +1,9 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"sync/core/ot"
 )
 
@@ -11,57 +13,68 @@ const DebugSeperator = "\n======= %v =======\n"
 // Playground for pices of TIKI
 type Playground struct {
 	Tiki    *Tiki
-	Clients map[*Client]bool
+	Clients map[uint64]*Client
 
+	opHistory map[uint64]*SyncMessage
+	tranx     *Tranx
+	token     string
 	broadcast chan []byte
 }
 
 // GetPlayground by token
-func GetPlayground(t string) (*Playground, error) {
+func GetPlayground(t string, tr *Tranx) (*Playground, error) {
 	// doing things
 	tiki, err := GetTikiByToken(t)
 	if err != nil {
 		return nil, err
 	}
-	return NewPlayground(tiki)
+	return NewPlayground(tiki, t, tr)
 }
 
 // NewPlayground return a *Playground instance and error
-func NewPlayground(t *Tiki) (*Playground, error) {
+func NewPlayground(t *Tiki, token string, tranx *Tranx) (*Playground, error) {
 	fmt.Println("New playground")
 	return &Playground{
 		Tiki:    t,
-		Clients: make(map[*Client]bool),
+		Clients: make(map[uint64]*Client),
 
+		opHistory: make(map[uint64]*SyncMessage),
+		tranx:     tranx,
+		token:     token,
 		broadcast: make(chan []byte),
 	}, nil
 }
 
 // Join for new client join into playground
 func (p *Playground) Join(c *Client) (ok bool, err error) {
-	p.Clients[c] = true
+	p.Clients[c.UID] = c
 	fmt.Printf("UID: %d join\n", c.UID)
-	//p.LoadTiki(c)
 	return true, nil
 }
 
 // Left called when client close the connection
 func (p *Playground) Left(c *Client) {
 	fmt.Printf("UID: %d left\n", c.UID)
-	delete(p.Clients, c)
+	delete(p.Clients, c.UID)
+	if len(p.Clients) == 0 {
+		p.tranx.closePlayground(p.token)
+	}
 }
 
-// LoadTiki when the client join
+// ChaseTiki when the client join
 // To sync the lag tiki
-func (p *Playground) LoadTiki(c *Client) {
+func (p *Playground) ChaseTiki(c *Client) {
+	if len(p.Tiki.Content) == 0 {
+		return
+	}
+
 	msg := &SyncMessage{}
+	msg.Type = ForceSyncMsg
 	msg.UID = c.UID
 	msg.Version = p.Tiki.Version
 	msg.Sequence = 0
-	msg.OP = Operation{
-		Insert: ot.Insert{
-			Insert: p.Tiki.Content,
-		},
+	msg.OP = []ot.Operation{
+		ot.Insert(p.Tiki.Content),
 	}
 	m, err := msg.ToJSON()
 	if err != nil {
@@ -75,10 +88,43 @@ func (p *Playground) Run() {
 	for {
 		select {
 		case msg := <-p.broadcast:
-			fmt.Printf("broadcast: %s\n", msg)
-			for c := range p.Clients {
-				// 消息发送
-				c.send <- msg
+			// content apply changes
+			m := &SyncMessage{}
+			json.Unmarshal(msg, m)
+			if m.Version == p.Tiki.Version {
+				log.Printf("v%d content %s\n", p.Tiki.Version, p.Tiki.Content)
+
+				// save to history
+				p.opHistory[m.Version] = m
+
+				p.Tiki.Content = m.Apply(p.Tiki.Content) // apply to server
+				m.Version++
+				p.Tiki.Version = m.Version
+
+				msg, _ = m.ToJSON()
+				log.Printf("broadcast: %s\n", msg)
+				for uid, c := range p.Clients {
+					if uid == m.UID { // ack
+						temp := &SyncMessage{
+							Type:     ACKMsg,
+							Version:  m.Version,
+							Sequence: m.Sequence,
+						}
+						ack, _ := temp.ToJSON()
+						c.send <- ack
+						continue
+					}
+					// 消息发送
+					c.send <- msg
+				}
+				// } else if m.Version == p.Tiki.Version-1 {
+				// 	// intention-preservation
+				// 	m.IntentionPreservation(p.opHistory[m.Version-1])
+
+			} else { // this client lag the server version
+				// chase
+				log.Printf("v%d force sync %d\n", p.Tiki.Version, m.UID)
+				p.ChaseTiki(p.Clients[m.UID])
 			}
 		}
 	}
@@ -94,7 +140,7 @@ func (p *Playground) Debug() {
 	fmt.Printf("Version: %d\n", p.Tiki.Version)
 	// Display Clients
 	fmt.Print(fmt.Sprintf(DebugSeperator, "Clients"))
-	for c := range p.Clients {
+	for _, c := range p.Clients {
 		fmt.Printf("ID: %d\n", c.UID)
 	}
 }

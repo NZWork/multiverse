@@ -1,9 +1,11 @@
 package core
 
 import (
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"strconv"
+
+	"github.com/gorilla/websocket"
 )
 
 var upgrader = websocket.Upgrader{
@@ -36,6 +38,8 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := GetClient(conn, p)
+	c.UID, _ = strconv.ParseUint(r.URL.Query().Get("uid"), 10, 32)
+
 	_, err = p.Join(c)
 	if err != nil {
 		log.Printf("error when join playground %v\n", err.Error())
@@ -43,7 +47,7 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 	}
 	go c.write()
 	// Sync tiki content
-	c.send <- []byte(p.Tiki.Content)
+	p.ChaseTiki(c) // chase the progress of tiki
 	c.read()
 }
 
@@ -55,11 +59,15 @@ func (t *Tranx) getPlayground(token string) (p *Playground, err error) {
 		return
 	}
 	// playground did not exists or invalid
-	p, err = GetPlayground(token)
+	p, err = GetPlayground(token, t)
 	if err != nil {
 		return
 	}
 	go p.Run()
 	t.playgrounds[token] = p
 	return
+}
+
+func (t *Tranx) closePlayground(token string) {
+	delete(t.playgrounds, token)
 }

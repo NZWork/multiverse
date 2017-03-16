@@ -5,7 +5,7 @@
 
 <body>
     <script src="https://cdn.bootcss.com/jquery/3.1.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/diff_match_patch/20121119/diff_match_patch.js"></script>
+    <script src="//cdn.bootcss.com/diff_match_patch/20121119/diff_match_patch.js"></script>
 
     <script src="/ot.js"></script>
     <script src="/util.js"></script>
@@ -16,10 +16,9 @@
     <p><span id="timing">0</span>ms</p>
     <form>
         <p>
-            Token <input id="token" type="text">
+            Token <input id="token" type="text"><br>
             <button type="button" onclick="connect();" id="cb">Connect</button>
             <button type="button" onclick="disconnect();" id="db" disabled>Disconnect</button>
-
         </p>
     </form>
 

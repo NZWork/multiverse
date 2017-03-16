@@ -2,31 +2,58 @@ package core
 
 import (
 	"encoding/json"
+	"log"
 	"sync/core/ot"
+)
+
+const (
+	OTMsg = iota
+	ACKMsg
+	ForceSyncMsg
 )
 
 // SyncMessage the struct of ot message from fe
 type SyncMessage struct {
-	UID      uint64    `json:"uid"`
-	Sequence uint64    `json:"seq"`
-	Version  uint64    `json:"ver"`
-	OP       Operation `json:"op"`
+	Type     uint           `json:"type"`
+	UID      uint64         `json:"uid"`
+	Sequence uint64         `json:"seq"`
+	Version  uint64         `json:"ver"`
+	OP       []ot.Operation `json:"op"`
 }
 
-type Operation struct {
-	Insert ot.Insert `json:"insert"`
-	Delete ot.Delete `json:"delete"`
-	Retain ot.Retain `json:"retain"`
+// Apply operation to text
+func (s *SyncMessage) Apply(content string) string {
+	cursor := 0
+	for _, op := range s.OP {
+		switch op.Type {
+		case ot.OPRetain:
+			cursor += int(op.Operation.(float64))
+		case ot.OPInsert:
+			if cursor == len(content) {
+				content += op.Operation.(string)
+			} else {
+				temp := content[:cursor]
+				temp += op.Operation.(string)
+				temp += content[cursor:]
+				cursor += len(op.Operation.(string))
+				content = temp
+			}
+		case ot.OPDelete:
+			if len(op.Operation.(string)) == len(content) {
+				content = ""
+			} else if content[cursor:cursor+len(op.Operation.(string))] == op.Operation.(string) {
+				temp := content[:cursor]
+				temp += content[cursor+len(op.Operation.(string)):]
+				content = temp
+			}
+		}
+	}
+	log.Printf("applied %s\n", content)
+	return content
 }
 
-func (o *Operation) Apply(content string) (newContent string) {
-	if o.Retain.Length != 0 {
-		newContent = content[:o.Retain.Length]
-	}
-	if len(o.Insert.Insert) != 0 {
-
-	}
-	return
+func (s *SyncMessage) IntentionPreservation(pre *SyncMessage) {
+	s.Version += 2
 }
 
 // ToJSON marshal the struct to json
