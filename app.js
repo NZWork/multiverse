@@ -4,6 +4,7 @@ var engine = new diff_match_patch
 var his = ""
 var seq = 0
 var ver = 0
+var otLock = false
 
 // WS
 var conn = null
@@ -31,17 +32,21 @@ Object.prototype.getName = function() {
     return (results && results.length > 1) ? results[1] : ""
 }
 
+$(document).ready(function(){
+    $('#main').on('keyup', function() {
+        console.log('typed')
+        sync()
+    });
+})
+
+
 //  Change 转换为 一个 JSON
 function changeToJSON(change) {
     var data = new Object()
-    data['op'] = new Array()
-
+    var ops = new Object()
+    ops.op = new Array()
     var shouldSend = false
-
     var last = change.length - 1
-
-    var addCursor = 0, removeCursor = 0
-
     for (var i = 0; i < change.length; i++) {
         var op = change[i].getName()
 
@@ -49,33 +54,43 @@ function changeToJSON(change) {
             if (i == last) { // 最后一个retain扔掉
                 continue
             }
-            data['op'].push({'type': OP_RETAIN, 'op': change[i].length})
-        } else if (op == 'Insert') {
-            data['op'].push({'type': OP_INSERT, 'op': change.addendum.substring(addCursor, addCursor+change[i]['length'])})
-            addCursor += change[i]['length'] // move cursor
-
-            shouldSend = true
-        } else if (op == 'Skip') {
-            data['op'].push({'type': OP_DELETE, 'op': change.removendum.substring(removeCursor, removeCursor+change[i]['length'])})
-            removeCursor += change[i]['length']
-
+        } else {
             shouldSend = true
         }
+
+        switch (op) {
+            case 'Retain':
+                change[i]['type'] = OP_RETAIN
+                break
+            case 'Skip':
+                change[i]['type'] = OP_DELETE
+                break
+            case 'Insert':
+                change[i]['type'] = OP_INSERT
+                break
+            default:
+        }
+        ops.op.push(change[i])
     }
     if (shouldSend) {
+
+        ops.adden = change.addendum
+        ops.inputLength = change.inputLength
+        ops.outputLength = change.outputLength
+        ops.removen = change.removendum
+
         seq++
         data['type'] = OT_MSG
         data['seq'] = seq
         data['uid'] = uid
         data['ver'] = ver
+        data['ops'] = ops
         return JSON.stringify(data)
     }
 }
 
 function JSONToChange(json) {
-    var ops = [],
-        removendum = '',
-        addendum = ''
+    var ops = []
     if (json == "") {
         return
     }
@@ -98,46 +113,43 @@ function JSONToChange(json) {
         obj.val('')
     }
 
-    ver = data.ver
-
-    for (var i = 0; i < data['op'].length; i++) {
-        var current = data['op'][i]
+    for (var i = 0; i < data.ops.op.length; i++) {
+        var current = data.ops.op[i]
 
         switch (current['type']) {
             case OP_RETAIN:
-                ops.push(new ot.Retain(current.op))
-                if (current.op < pos) {
+                ops.push(new ot.Retain(current.length))
+                if (current.length < pos) {
                     console.log('drift')
                     cursorDrift = true
                 }
-                break;
+                break
             case OP_INSERT:
-                ops.push(new ot.Insert(current.op.length))
-                addendum += current.op
+                ops.push(new ot.Insert(current.length))
                 break;
             case OP_DELETE:
-                ops.push(new ot.Skip(current.op.length))
+                ops.push(new ot.Skip(current.length))
                 break;
             default:
         }
     }
 
     var change = new ot.Changeset(ops)
-    change.addendum = addendum
+    change.addendum = data.ops.adden
+    change.removendum = data.ops.removen
+    change.inputLength = data.ops.inputLength
+    change.outputLength = data.ops.outputLength
 
 
     let text = obj.val()
-    change.inputLength = text.length
     his = change.apply(text)
 
     if (cursorDrift) {
-        pos += addendum.length
+        pos += change.addendum.length
     }
 
-    let newOne = new Object
-    newOne.content = his
-    newOne.pos = pos
-    return newOne
+    ver = data.ver
+    return pos
 }
 
 function sync() {
@@ -147,7 +159,7 @@ function sync() {
         return
     }
     let change = Changeset.fromDiff(diff)
-    console.log(change)
+    // console.log(change)
     let s = changeToJSON(change)
     if (s != null) {
         sendMsg(s)
@@ -157,7 +169,7 @@ function sync() {
 
 function sendMsg(msg) {
     console.log("send: " + msg)
-    send = Date.now()
+    // send = Date.now()
     conn.send(msg)
 }
 
@@ -180,14 +192,15 @@ function connect() {
     }
 
     conn.onmessage = function(e) {
+        console.log('current content: ' + $('#main').val())
         let data = e.data
         console.log('received ' + data)
-        let moded = JSONToChange(e.data)
-        if (moded == null) {
+        let modedPos = JSONToChange(e.data)
+        if (modedPos == null) {
             return
         }
-        $('#main').val(moded.content)
-        setCaretPosition('main', moded.pos)
+        $('#main').val(his)
+        setCaretPosition('main', modedPos)
     }
 
     conn.onclose = function() {
