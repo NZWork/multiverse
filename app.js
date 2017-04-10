@@ -17,6 +17,9 @@ var lastMsg = 0
 var didClose = false
 var typing = false
 
+var ChangesetQueueLock = false
+var ChangesetQueue = []
+
 const OP_RETAIN = 0
 const OP_INSERT = 1
 const OP_DELETE = 2
@@ -32,9 +35,8 @@ Object.prototype.getName = function() {
     return (results && results.length > 1) ? results[1] : ""
 }
 
-$(document).ready(function(){
+$(document).ready(function() {
     $('#main').on('keyup', function() {
-        console.log('typed')
         sync()
     });
 })
@@ -103,6 +105,8 @@ function JSONToChange(json) {
 
     if (data['type'] == ACK_MSG) {
         ver = data.ver
+        console.log('ack')
+        ChangesetQueueLock = false // unclock
         return
     }
 
@@ -159,17 +163,38 @@ function sync() {
         return
     }
     let change = Changeset.fromDiff(diff)
-    // console.log(change)
-    let s = changeToJSON(change)
-    if (s != null) {
-        sendMsg(s)
-        his = text
-    }
+    his = text
+    ChangesetQueue.push(change)
+
+    // let s = changeToJSON(change)
+    // if (s != null) {
+    //     sendMsg(s)
+    //
+    //     his = text
+    // }
 }
+
+var changesetQueueConsumer = setInterval(function() {
+    if (!ChangesetQueueLock) { // get ACK
+        var merged = ChangesetQueue.shift()
+        while (ChangesetQueue.length != 0) {
+            merged = merged.merge(ChangesetQueue.shift())
+        }
+        if (merged != null) {
+            let msg = changeToJSON(merged)
+            if (msg != null) {
+                sendMsg(msg)
+            } else {
+                ChangesetQueueLock = true // lock
+            }
+        }
+    }
+}, 1000)
 
 function sendMsg(msg) {
     console.log("send: " + msg)
     // send = Date.now()
+    ChangesetQueueLock = true // lock
     conn.send(msg)
 }
 
@@ -185,6 +210,8 @@ function connect() {
     console.log("connect with sync")
     conn.onopen = function() {
         console.log("connected to sync ")
+        //clearInterval(changesetQueueConsumer);
+        //changesetQueueConsumer() // start queue consumer
     }
     conn.onclose = function(e) {
         didClose = true
@@ -192,9 +219,8 @@ function connect() {
     }
 
     conn.onmessage = function(e) {
-        console.log('current content: ' + $('#main').val())
         let data = e.data
-        console.log('received ' + data)
+        // console.log('received ' + data)
         let modedPos = JSONToChange(e.data)
         if (modedPos == null) {
             return

@@ -71,7 +71,7 @@ func ChangesetFromDiff() (c Changeset) {
 
 // IntentionPreservation transform an editing operation into a new form according to the effects of previously executed concurrent operations
 // so that the transformed operation can achieve the correct effect
-func (c *Changeset) IntentionPreservation(pre *Changeset) {
+func (c *Changeset) IntentionPreservation(pre *Changeset) (shouldForceSync bool) {
 	ops1, ops2 := Clone(pre.OP), Clone(c.OP)
 	var op1, op2 Operation
 	var tempOp1, tempOp2 Operation
@@ -138,10 +138,17 @@ func (c *Changeset) IntentionPreservation(pre *Changeset) {
 			if op2.Type == OPRetain {
 				// newStack = append(newStack, op2)
 			} else if op2.Type == OPInsert || op2.Type == OPDelete {
-				temp, _ := Get(newStack, len(newStack)-1)
+				backwardPosition := len(newStack) - 1
+
+				temp, inStack := Get(newStack, backwardPosition)
+				if !inStack || backwardPosition < 0 {
+					shouldForceSync = true
+					return
+				}
+
 				temp.Length -= op1.Length
 				if temp.Length == 0 {
-					newStack = newStack[:len(newStack)-1]
+					newStack = newStack[:backwardPosition]
 				}
 				newStack = append(newStack, op2)
 			}
@@ -152,7 +159,7 @@ func (c *Changeset) IntentionPreservation(pre *Changeset) {
 	}
 
 	c.OP = newStack
-
+	return
 }
 
 /**
