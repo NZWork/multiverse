@@ -28,6 +28,7 @@ const OP_DELETE = 2
 const OT_MSG = 0
 const ACK_MSG = 1
 const FORCE_SYNC_MSG = 2
+const INIT_MSG = 3
 
 Object.prototype.getName = function() {
     var funcNameRegex = /function (.{1,})\(/
@@ -103,6 +104,12 @@ function JSONToChange(json) {
     let pos = getCaretPosition('main')
     let cursorDrift = false
 
+    if (data.type == INIT_MSG) {
+        uid = data.uid
+        console.log('user data init')
+        return
+    }
+
     if (data['type'] == ACK_MSG) {
         ver = data.ver
         console.log('ack')
@@ -174,6 +181,7 @@ function sync() {
     // }
 }
 
+// Queue consumer
 var changesetQueueConsumer = setInterval(function() {
     if (!ChangesetQueueLock) { // get ACK
         var merged = ChangesetQueue.shift()
@@ -200,18 +208,16 @@ function sendMsg(msg) {
 
 function connect() {
     let token = $('#token').val()
+    let pubkey = $('#pubkey').val()
     if (token.length == 0) {
         alert("token invalid")
         return
     }
-    uid = Math.ceil(Math.random() * 1000)
 
-    conn = new WebSocket(target + "?token=" + token + '&uid=' + uid)
+    conn = new WebSocket(target + "?token=" + encodeURIComponent(token) + '&pubkey=' + encodeURIComponent(pubkey))
     console.log("connect with sync")
     conn.onopen = function() {
         console.log("connected to sync ")
-        //clearInterval(changesetQueueConsumer);
-        //changesetQueueConsumer() // start queue consumer
     }
     conn.onclose = function(e) {
         didClose = true
@@ -229,9 +235,10 @@ function connect() {
         setCaretPosition('main', modedPos)
     }
 
-    conn.onclose = function() {
-        console.log('closed')
-        $('#main').attr('readonly', 'readonly')
+    conn.onclose = function(e) {
+        console.log(e)
+        console.log('closed ['+e.code+'] '+e.reason)
+        $('#main').attr('readonly', true)
     }
 
     $('#cb').attr("disabled", true)

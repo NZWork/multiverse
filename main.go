@@ -2,8 +2,9 @@ package main
 
 import (
 	"log"
+	"multiverse/core"
+	"multiverse/data"
 	"net/http"
-	"sync/core"
 )
 
 func home(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +25,8 @@ func utiljs(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 	t := core.NewTranx()
+	data.SetupRedis()
+
 	http.HandleFunc("/", home)
 	http.HandleFunc("/app.js", appjs)
 	http.HandleFunc("/ot.js", otjs)

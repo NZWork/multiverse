@@ -1,42 +1,49 @@
 package core
 
 import (
-	//"errors"
-	"github.com/sergi/go-diff/diffmatchpatch"
 	"log"
+	"multiverse/data"
+	"strings"
 	"sync"
+
+	"github.com/sergi/go-diff/diffmatchpatch"
 )
 
 // Tiki contains everything that TIKI have
 type Tiki struct {
-	TID     uint64
-	Title   []byte
-	Content string
-	Version uint64
+	ProjectID  string
+	Token      string
+	CacheToken string
+	Content    string
+	Version    uint64
 
 	dmp  *diffmatchpatch.DiffMatchPatch
 	lock sync.RWMutex
 }
 
-// GetTikiByID will return a tiki instance by ID
-func GetTikiByID(id uint64) (*Tiki, error) {
-	// Load tiki from storage service
-	return &Tiki{
-		dmp:     diffmatchpatch.New(),
-		Content: "",
-		Version: 0,
-	}, nil
+// GetTiki return a tiki instance by token
+func GetTiki(token string) (t *Tiki, err error) {
+	// split token
+	temp := strings.Split(token, "_")
+	content, err := data.GetContent(token)
+	if err != nil {
+		return nil, err
+	}
+
+	t = &Tiki{
+		ProjectID:  temp[0],
+		Token:      temp[1],
+		dmp:        diffmatchpatch.New(),
+		Content:    string(content),
+		CacheToken: token,
+		Version:    0,
+	}
+	return
 }
 
-// GetTikiByToken return a tiki instance by token
-func GetTikiByToken(token string) (t *Tiki, err error) {
-	//err = errors.New("invalid token")
-	t = &Tiki{
-		TID:     233,
-		dmp:     diffmatchpatch.New(),
-		Content: "",
-		Version: 0,
-	}
+// UpdateCache save content
+func (t *Tiki) UpdateCache() (err error) {
+	err = data.SetContent(t.CacheToken, []byte(t.Content))
 	return
 }
 

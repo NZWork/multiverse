@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"sync/core/ot"
+	"multiverse/core/ot"
 )
 
 // DebugSeperator for output
@@ -24,7 +24,7 @@ type Playground struct {
 // GetPlayground by token
 func GetPlayground(t string, tr *Tranx) (*Playground, error) {
 	// doing things
-	tiki, err := GetTikiByToken(t)
+	tiki, err := GetTiki(t)
 	if err != nil {
 		return nil, err
 	}
@@ -89,6 +89,19 @@ func (p *Playground) ChaseTiki(c *Client) {
 	c.send <- m
 }
 
+// InitClient 初始化客户端
+func (p *Playground) InitClient(c *Client) {
+	msg := &SyncMessage{
+		Type: InitMsg,
+		UID:  c.UID,
+	}
+	m, err := msg.ToJSON()
+	if err != nil {
+		panic(err)
+	}
+	c.send <- m
+}
+
 // Run goroutine handling A playground connections
 func (p *Playground) Run() {
 	var err error
@@ -103,7 +116,6 @@ func (p *Playground) Run() {
 				if m.Version == p.Tiki.Version-1 {
 					// intention-preservation
 					log.Println("intention preservation")
-
 					m.Change.IntentionPreservation(&p.opHistory[m.Version].Change)
 					m.Version += 2
 					shouldChase = true
@@ -112,6 +124,12 @@ func (p *Playground) Run() {
 				// save to history
 				p.opHistory[m.Version] = m
 				p.Tiki.Content, err = m.Change.Apply(p.Tiki.Content) // apply to server
+				err = p.Tiki.UpdateCache()
+				if err != nil {
+					log.Printf("failed to save content to redis %s", err.Error())
+				} else {
+					log.Println("save to redis")
+				}
 				log.Printf("v%d content %s\n", p.Tiki.Version, p.Tiki.Content)
 
 				if err != nil {
@@ -126,7 +144,7 @@ func (p *Playground) Run() {
 					if uid == m.UID { // ack
 						if shouldChase {
 							p.ChaseTiki(c)
-							log.Println("should chase")
+							// log.Println("should chase")
 						} else {
 							temp := &SyncMessage{
 								Type:     ACKMsg,
@@ -154,8 +172,8 @@ func (p *Playground) Run() {
 func (p *Playground) Debug() {
 	// Display TIKI
 	fmt.Print(fmt.Sprintf(DebugSeperator, "Tiki"))
-	fmt.Printf("TID: %d\n", p.Tiki.TID)
-	fmt.Printf("Title: %s\n", p.Tiki.Title)
+	fmt.Printf("ProjectID: %s\n", p.Tiki.ProjectID)
+	fmt.Printf("Token: %s\n", p.Tiki.Token)
 	fmt.Printf("Content: %s\n", p.Tiki.Content)
 	fmt.Printf("Version: %d\n", p.Tiki.Version)
 	// Display Clients

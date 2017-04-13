@@ -2,13 +2,14 @@ package core
 
 import (
 	"encoding/json"
-	"sync/core/ot"
+	"multiverse/core/ot"
 )
 
 const (
 	OTMsg = iota
 	ACKMsg
 	ForceSyncMsg
+	InitMsg
 )
 
 // SyncMessage the struct of ot message from fe

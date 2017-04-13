@@ -2,8 +2,8 @@ package core
 
 import (
 	"log"
+	"multiverse/data"
 	"net/http"
-	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -31,23 +31,37 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Panic(err.Error())
 	}
+	token := r.URL.Query().Get("token")
+	pubkey := r.URL.Query().Get("pubkey")
 
-	p, err := t.getPlayground(r.URL.Query().Get("token"))
+	log.Printf("token %s, pubkey %s\n", token, pubkey)
+
+	result, err := data.DeserializeToken(token, pubkey)
+	if err != nil {
+		log.Printf("failed to deserialize token and pubkey due to %s\n", err.Error())
+		conn.Close()
+		return
+	}
+
+	p, err := t.getPlayground(result.ProjectID + "_" + result.Token)
 	if err != nil { // fail
 		log.Printf("connect closed due to %s\n", err.Error())
+		conn.Close()
 		return
 	}
 	c := GetClient(conn, p)
-	c.UID, _ = strconv.ParseUint(r.URL.Query().Get("uid"), 10, 32)
+	c.UID = uint64(result.UID)
 
 	_, err = p.Join(c)
 	if err != nil {
 		log.Printf("error when join playground %v\n", err.Error())
+		conn.Close()
 		return
 	}
 	go c.write()
 	// Sync tiki content
-	p.ChaseTiki(c) // chase the progress of tiki
+	p.InitClient(c) // init client
+	p.ChaseTiki(c)  // chase the progress of tiki
 	c.read()
 }
 
