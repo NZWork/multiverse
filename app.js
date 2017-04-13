@@ -8,7 +8,7 @@ var otLock = false
 
 // WS
 var conn = null
-var target = "ws://" + location.host + "/sync"
+var target = "wss://" + location.host + "/sync"
 var uid = 0
 
 // Switcher
