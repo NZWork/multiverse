@@ -1,6 +1,7 @@
 package core
 
 import (
+	"errors"
 	"log"
 	"multiverse/data"
 	"strings"
@@ -25,6 +26,9 @@ type Tiki struct {
 func GetTiki(token string) (t *Tiki, err error) {
 	// split token
 	temp := strings.Split(token, "_")
+	if len(temp) != 2 {
+		return nil, errors.New("invalid token")
+	}
 	content, err := data.GetContent(token)
 	if err != nil {
 		return nil, err

@@ -21,16 +21,26 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 
 	c.InputLength = uint(len(content))
 
+	lenOfOriginContent := len(content)
+	lenOfAdden := len(c.Adden)
+
 	for _, op := range c.OP {
 		switch op.Type {
 		case OPRetain:
 			temp = op.Length
 			nextPointer = pointer + temp
+			// bce
+			if pointer < 0 || int(pointer) > lenOfOriginContent-1 || int(nextPointer) > lenOfOriginContent-1 {
+				return "", errors.New("conflict")
+			}
 			newContent += content[pointer:nextPointer]
 			pointer += temp
 		case OPInsert:
 			temp = op.Length
 			nextPointer = addenPointer + temp
+			if addenPointer < 0 || int(addenPointer) > lenOfAdden-1 || int(nextPointer) > lenOfAdden-1 {
+				return "", errors.New("conflict")
+			}
 			newContent += c.Adden[addenPointer:nextPointer]
 			addenPointer += temp
 		case OPDelete:
@@ -62,11 +72,6 @@ func (c *Changeset) Invert() *Changeset {
 	c.Removen = temp
 
 	return c
-}
-
-// ChangesetFromDiff return a changeset transforms from a diff
-func ChangesetFromDiff() (c Changeset) {
-	return
 }
 
 // IntentionPreservation transform an editing operation into a new form according to the effects of previously executed concurrent operations

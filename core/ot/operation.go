@@ -147,11 +147,3 @@ func (o Operation) Debug() string {
 	}
 	return fmt.Sprintf("%s %d", t, o.Length)
 }
-
-func OperationesToString(ops []Operation) (s string) {
-	for _, op := range ops {
-		s += op.Debug()
-		s += " | "
-	}
-	return
-}
