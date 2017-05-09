@@ -19,7 +19,7 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 	var addenPointer, removenPointer, pointer uint = 0, 0, 0
 	var temp, nextPointer uint
 
-	c.InputLength = uint(len(content))
+	// c.InputLength = uint(len(content))
 
 	lenOfOriginContent := len(content)
 	lenOfAdden := len(c.Adden)
@@ -30,21 +30,29 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 			temp = op.Length
 			nextPointer = pointer + temp
 			// bce
-			if pointer < 0 || int(pointer) > lenOfOriginContent-1 || int(nextPointer) > lenOfOriginContent-1 {
-				return "", errors.New("conflict")
+			if pointer < 0 || int(pointer) > lenOfOriginContent || int(nextPointer) > lenOfOriginContent {
+				log.Printf("p%v loc%v np%v\n", pointer, lenOfOriginContent, nextPointer)
+				log.Printf("1%v 2%v 3%v\n", pointer < 0, int(pointer) > lenOfOriginContent, int(nextPointer) > lenOfOriginContent)
+				return "", errors.New("slice bounds out of range")
 			}
 			newContent += content[pointer:nextPointer]
 			pointer += temp
 		case OPInsert:
 			temp = op.Length
 			nextPointer = addenPointer + temp
-			if addenPointer < 0 || int(addenPointer) > lenOfAdden-1 || int(nextPointer) > lenOfAdden-1 {
-				return "", errors.New("conflict")
+			if addenPointer < 0 || int(addenPointer) > lenOfAdden || int(nextPointer) > lenOfAdden {
+				log.Printf("ap%v la%v np%v\n", addenPointer, lenOfAdden, nextPointer)
+				log.Printf("4%v 5%v 6%v\n", addenPointer < 0, int(addenPointer) > lenOfAdden, int(nextPointer) > lenOfAdden)
+				return "", errors.New("slice bounds out of range")
 			}
 			newContent += c.Adden[addenPointer:nextPointer]
 			addenPointer += temp
 		case OPDelete:
 			temp = op.Length
+			if pointer < 0 || int(pointer+temp) > lenOfOriginContent-1 || removenPointer < 0 || int(removenPointer+temp) > len(c.Removen)-1 {
+				log.Printf("7%v 8%v 9%v 10%v \n", pointer < 0, int(pointer+temp) > lenOfOriginContent-1, removenPointer < 0, int(removenPointer+temp) > len(c.Removen)-1)
+				return "", errors.New("slice bounds out of range")
+			}
 			if content[pointer:pointer+temp] == c.Removen[removenPointer:removenPointer+temp] {
 				pointer += temp
 				removenPointer += temp

@@ -64,8 +64,6 @@ func (c *Client) read() {
 		message = bytes.TrimSpace(bytes.Replace(message, newline, space, -1))
 		log.Printf("receive: %s\n", message)
 		c.playground.broadcast <- []byte(message)
-		//c.playground.Tiki.Merge(string(message))
-		//c.playground.broadcast <- []byte(c.playground.Tiki.Content)
 	}
 }
 

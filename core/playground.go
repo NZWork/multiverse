@@ -87,81 +87,110 @@ func (p *Playground) ChaseTiki(c *Client) {
 		panic(err)
 	}
 	c.send <- m
+	log.Printf("sync with server UID %v\n", c.UID)
 }
 
 // InitClient 初始化客户端
 func (p *Playground) InitClient(c *Client) {
-	msg := &SyncMessage{
-		Type: InitMsg,
-		UID:  c.UID,
+	length := uint(len(p.Tiki.Content))
+	msg := &SyncMessage{}
+	msg.Type = InitMsg
+	msg.UID = c.UID
+	msg.Version = p.Tiki.Version
+	msg.Sequence = 0
+	msg.Change = ot.Changeset{
+		OP: []ot.Operation{
+			ot.Insert(length),
+		},
+		Adden:        p.Tiki.Content,
+		InputLength:  0,
+		OutputLength: length,
 	}
 	m, err := msg.ToJSON()
 	if err != nil {
 		panic(err)
 	}
 	c.send <- m
+	log.Printf("init client UID %v\n", c.UID)
 }
 
 // Run goroutine handling A playground connections
 func (p *Playground) Run() {
-	var err error
+	var (
+		err        error
+		temp       string
+		ackMsgJSON []byte
+		tempUID    uint64
+		tempMsg    *SyncMessage
+		tempClient *Client
+	)
 	for {
 		select {
 		case msg := <-p.broadcast:
 			// content apply changes
+			shouldChase := false
 			m := &SyncMessage{}
 			json.Unmarshal(msg, m)
-			if m.Version == p.Tiki.Version || m.Version == p.Tiki.Version-1 {
-				shouldChase := false
-				if m.Version == p.Tiki.Version-1 {
-					// intention-preservation
-					log.Println("intention preservation")
-					m.Change.IntentionPreservation(&p.opHistory[m.Version].Change)
-					m.Version += 2
-					shouldChase = true
-				}
-
-				// save to history
-				p.opHistory[m.Version] = m
-				p.Tiki.Content, err = m.Change.Apply(p.Tiki.Content) // apply to server
-				err = p.Tiki.UpdateCache()
-				if err != nil {
-					log.Printf("failed to save content to redis %s", err.Error())
-				} else {
-					log.Println("save to redis")
-				}
-				log.Printf("v%d content %s\n", p.Tiki.Version, p.Tiki.Content)
-
-				if err != nil {
-					panic(err)
-				}
-				m.Version++
-				p.Tiki.Version = m.Version
-
-				msg, _ = m.ToJSON()
-				log.Printf("broadcast: %s\n", msg)
-				for uid, c := range p.Clients {
-					if uid == m.UID { // ack
-						if shouldChase {
-							p.ChaseTiki(c)
-							// log.Println("should chase")
-						} else {
-							temp := &SyncMessage{
-								Type:     ACKMsg,
-								Version:  m.Version,
-								Sequence: m.Sequence,
-							}
-							ack, _ := temp.ToJSON()
-							c.send <- ack
-						}
-						continue
+			// 主动同步
+			if m.Type == ActiveSyncMsg {
+				p.ChaseTiki(p.Clients[m.UID])
+			} else {
+				// Operational Transformation
+				if m.Version == p.Tiki.Version || m.Version == p.Tiki.Version-1 {
+					if m.Version == p.Tiki.Version-1 {
+						// intention-preservation
+						log.Println("intention preservation")
+						m.Change.IntentionPreservation(&p.opHistory[m.Version].Change)
+						m.Version++
+						shouldChase = true
 					}
-					// 消息发送
-					c.send <- msg
+
+					// save to history
+					p.opHistory[m.Version] = m
+					temp, err = m.Change.Apply(p.Tiki.Content) // apply to server
+					if err != nil {
+						goto FORCE_SYNC
+					}
+					p.Tiki.Content = temp
+					err = p.Tiki.UpdateCache()
+					if err != nil {
+						log.Printf("failed to save content to redis %s", err.Error())
+					} else {
+						log.Println("save to redis")
+					}
+					log.Printf("v%d content %s\n", p.Tiki.Version, p.Tiki.Content)
+					if err != nil {
+						log.Println(err)
+					}
+					m.Version++
+					p.Tiki.Version = m.Version
+
+					msg, _ = m.ToJSON()
+					log.Printf("broadcast: %s\n", msg)
+					for tempUID, tempClient = range p.Clients {
+						if tempUID == m.UID { // ack
+							if shouldChase {
+								p.ChaseTiki(tempClient)
+							} else {
+								tempMsg = &SyncMessage{
+									Type:     ACKMsg,
+									Version:  m.Version,
+									Sequence: m.Sequence,
+								}
+								ackMsgJSON, _ = tempMsg.ToJSON()
+								tempClient.send <- ackMsgJSON
+							}
+							continue
+						}
+						// 消息发送
+						tempClient.send <- msg
+					}
 				}
-			} else { // this client lag the server version
-				// chase
-				log.Printf("v%d force sync %d\n", p.Tiki.Version, m.UID)
+			}
+		FORCE_SYNC:
+			if err != nil {
+				// this client lag the server version
+				// log.Printf("v%d force sync %d\n", p.Tiki.Version, m.UID)
 				p.ChaseTiki(p.Clients[m.UID])
 			}
 		}

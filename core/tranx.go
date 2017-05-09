@@ -44,6 +44,7 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 	}
 
 	p, err := t.getPlayground(result.ProjectID + "_" + result.Token)
+	log.Printf("Project ID %v token %v\n", result.ProjectID, result.Token)
 	if err != nil { // fail
 		log.Printf("connect closed due to %s\n", err.Error())
 		conn.Close()
@@ -61,7 +62,7 @@ func (t *Tranx) Fuck(w http.ResponseWriter, r *http.Request) {
 	go c.write()
 	// Sync tiki content
 	p.InitClient(c) // init client
-	p.ChaseTiki(c)  // chase the progress of tiki
+	// p.ChaseTiki(c)  // chase the progress of tiki
 	c.read()
 }
 

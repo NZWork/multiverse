@@ -10,6 +10,7 @@ const (
 	ACKMsg
 	ForceSyncMsg
 	InitMsg
+	ActiveSyncMsg
 )
 
 // SyncMessage the struct of ot message from fe

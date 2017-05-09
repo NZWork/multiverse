@@ -29,6 +29,7 @@ const OT_MSG = 0
 const ACK_MSG = 1
 const FORCE_SYNC_MSG = 2
 const INIT_MSG = 3
+const ACTIVE_SYNC_MSG = 4
 
 Object.prototype.getName = function() {
     var funcNameRegex = /function (.{1,})\(/
@@ -105,14 +106,14 @@ function JSONToChange(json) {
     let cursorDrift = false
 
     if (data.type == INIT_MSG) {
-        uid = data.uid
         console.log('user data init')
-        return
+        uid = data.uid
+        ver = data.ver
     }
 
     if (data['type'] == ACK_MSG) {
-        ver = data.ver
         console.log('ack')
+        ver = data.ver
         ChangesetQueueLock = false // unclock
         return
     }
@@ -122,6 +123,7 @@ function JSONToChange(json) {
         // clean all the content
         his = ''
         obj.val('')
+        seq = data.seq
     }
 
     for (var i = 0; i < data.ops.op.length; i++) {
@@ -153,13 +155,23 @@ function JSONToChange(json) {
 
 
     let text = obj.val()
-    his = change.apply(text)
+    try {
+        his = change.apply(text)
+    } catch (e) {
+        console.log(e)
+        // Empty all
+        ChangesetQueue = []
+        ChangesetQueueLock = false // unclock
+        sendMsg(JSON.stringify({'type': ACTIVE_SYNC_MSG, 'uid': uid}))
+        return null
+    }
 
     if (cursorDrift) {
         pos += change.addendum.length
     }
 
     ver = data.ver
+    console.log('load ops')
     return pos
 }
 
@@ -207,8 +219,8 @@ function sendMsg(msg) {
 }
 
 function connect() {
-    let token = $('#token').val()
-    let pubkey = $('#pubkey').val()
+    let token = $('#token').val().trim()
+    let pubkey = $('#pubkey').val().trim()
     if (token.length == 0) {
         alert("token invalid")
         return
