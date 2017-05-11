@@ -23,7 +23,7 @@ type Result struct {
 }
 
 // APIDomain API 域名
-const APIDomain = "https://app.dev.tiki.im/api/nz/"
+const APIDomain = "https://tiki.im/api/nz/"
 
 // XAuth 认证
 const XAuth = "5DE0CB6960FDD55B9F7C26E6554617B5"

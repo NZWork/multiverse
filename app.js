@@ -24,7 +24,6 @@ const OP_RETAIN = 0
 const OP_INSERT = 1
 const OP_DELETE = 2
 
-
 const OT_MSG = 0
 const ACK_MSG = 1
 const FORCE_SYNC_MSG = 2
@@ -42,7 +41,6 @@ $(document).ready(function() {
         sync()
     });
 })
-
 
 //  Change 转换为 一个 JSON
 function changeToJSON(change) {
@@ -77,7 +75,6 @@ function changeToJSON(change) {
         ops.op.push(change[i])
     }
     if (shouldSend) {
-
         ops.adden = change.addendum
         ops.inputLength = change.inputLength
         ops.outputLength = change.outputLength
@@ -112,14 +109,14 @@ function JSONToChange(json) {
     }
 
     if (data['type'] == ACK_MSG) {
-        console.log('ack')
+        // console.log('ack')
         ver = data.ver
         ChangesetQueueLock = false // unclock
         return
     }
 
     if (data['type'] == FORCE_SYNC_MSG) {
-        console.log('force sync')
+        // console.log('force sync')
         // clean all the content
         his = ''
         obj.val('')
@@ -133,7 +130,7 @@ function JSONToChange(json) {
             case OP_RETAIN:
                 ops.push(new ot.Retain(current.length))
                 if (current.length < pos) {
-                    console.log('drift')
+                    // console.log('drift')
                     cursorDrift = true
                 }
                 break
@@ -143,7 +140,6 @@ function JSONToChange(json) {
             case OP_DELETE:
                 ops.push(new ot.Skip(current.length))
                 break;
-            default:
         }
     }
 
@@ -153,12 +149,11 @@ function JSONToChange(json) {
     change.inputLength = data.ops.inputLength
     change.outputLength = data.ops.outputLength
 
-
     let text = obj.val()
     try {
         his = change.apply(text)
     } catch (e) {
-        console.log(e)
+        // console.log(e)
         // Empty all
         ChangesetQueue = []
         ChangesetQueueLock = false // unclock
@@ -171,7 +166,6 @@ function JSONToChange(json) {
     }
 
     ver = data.ver
-    console.log('load ops')
     return pos
 }
 
@@ -184,13 +178,6 @@ function sync() {
     let change = Changeset.fromDiff(diff)
     his = text
     ChangesetQueue.push(change)
-
-    // let s = changeToJSON(change)
-    // if (s != null) {
-    //     sendMsg(s)
-    //
-    //     his = text
-    // }
 }
 
 // Queue consumer
@@ -212,8 +199,7 @@ var changesetQueueConsumer = setInterval(function() {
 }, 1000)
 
 function sendMsg(msg) {
-    console.log("send: " + msg)
-    // send = Date.now()
+    // console.log("send: " + msg)
     ChangesetQueueLock = true // lock
     conn.send(msg)
 }
@@ -227,7 +213,6 @@ function connect() {
     }
 
     conn = new WebSocket(target + "?token=" + encodeURIComponent(token) + '&pubkey=' + encodeURIComponent(pubkey))
-    console.log("connect with sync")
     conn.onopen = function() {
         console.log("connected to sync ")
     }
@@ -248,13 +233,9 @@ function connect() {
     }
 
     conn.onclose = function(e) {
-        console.log(e)
         console.log('closed ['+e.code+'] '+e.reason)
         $('#main').attr('readonly', true)
     }
-
-    $('#cb').attr("disabled", true)
-    $('#db').attr("disabled", false)
     $('#main').attr("readonly", false)
 }
 
@@ -262,7 +243,5 @@ function connect() {
 function disconnect() {
     didClose = true
     conn.close()
-    $('#cb').attr("disabled", false)
-    $('#db').attr("disabled", true)
     $('#main').attr("readonly", true)
 }
