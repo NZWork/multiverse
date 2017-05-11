@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
-	"strconv"
 )
 
 // TokenResponse 结构
@@ -49,13 +48,13 @@ func DeserializeToken(token, pubkey string) (r Result, err error) {
 	return
 }
 
-// PersistenceTiki Tiki 持久化
-func PersistenceTiki(projectID int64, fileToken string) (err error) {
+// PersistenTiki Tiki 持久化
+func PersistenTiki(projectID, fileToken string) (err error) {
 	var data []byte
 	data, err = post(APIDomain+"save", map[string]interface{}{
 		"xauth": XAuth,
 		"token": fileToken,
-		"pid":   strconv.FormatInt(projectID, 10),
+		"pid":   projectID,
 	})
 
 	if err != nil {

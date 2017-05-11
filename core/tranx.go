@@ -4,6 +4,7 @@ import (
 	"log"
 	"multiverse/data"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/websocket"
 )
@@ -84,5 +85,12 @@ func (t *Tranx) getPlayground(token string) (p *Playground, err error) {
 }
 
 func (t *Tranx) closePlayground(token string) {
+	temp := strings.Split(token, "_")
+	if len(temp) == 2 {
+		err := data.PersistenTiki(temp[0], temp[1])
+		if err != nil {
+			log.Printf("error when persisten tiki: %s", err.Error())
+		}
+	}
 	delete(t.playgrounds, token)
 }
