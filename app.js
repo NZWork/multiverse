@@ -29,12 +29,8 @@ const ACK_MSG = 1
 const FORCE_SYNC_MSG = 2
 const INIT_MSG = 3
 const ACTIVE_SYNC_MSG = 4
+const funcNameRegex = /function (.{1,})\(/
 
-Object.prototype.getPropertyClassName = function() {
-    var funcNameRegex = /function (.{1,})\(/
-    var results = (funcNameRegex).exec((this).constructor.toString())
-    return (results && results.length > 1) ? results[1] : ""
-}
 
 $(document).ready(function() {
     $('#main').on('keyup', function() {
@@ -50,7 +46,8 @@ function changeToJSON(change) {
     var shouldSend = false
     var last = change.length - 1
     for (var i = 0; i < change.length; i++) {
-        var op = change[i].getPropertyClassName()
+        var results = (funcNameRegex).exec((change[i]).constructor.toString())
+        var op = (results && results.length > 1) ? results[1] : ''
 
         if (op == 'Retain') {
             if (i == last) { // 最后一个retain扔掉
@@ -102,6 +99,8 @@ function JSONToChange(json) {
     let pos = getCaretPosition('main')
     let cursorDrift = false
 
+    ChangesetQueueLock = false // unclock
+
     if (data.type == INIT_MSG) {
         console.log('user data init')
         uid = data.uid
@@ -111,7 +110,6 @@ function JSONToChange(json) {
     if (data['type'] == ACK_MSG) {
         // console.log('ack')
         ver = data.ver
-        ChangesetQueueLock = false // unclock
         return
     }
 

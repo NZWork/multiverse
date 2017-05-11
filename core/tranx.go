@@ -10,6 +10,12 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
+	CheckOrigin: func(r *http.Request) bool {
+		if r.Header.Get("Origin") == "https://tiki.im" {
+			return true
+		}
+		return false
+	},
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
@@ -87,10 +93,7 @@ func (t *Tranx) getPlayground(token string) (p *Playground, err error) {
 func (t *Tranx) closePlayground(token string) {
 	temp := strings.Split(token, "_")
 	if len(temp) == 2 {
-		err := data.PersistenTiki(temp[0], temp[1])
-		if err != nil {
-			log.Printf("error when persisten tiki: %s", err.Error())
-		}
+		data.PersistenTiki(temp[0], temp[1])
 	}
 	delete(t.playgrounds, token)
 }

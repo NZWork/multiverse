@@ -49,8 +49,9 @@ func DeserializeToken(token, pubkey string) (r Result, err error) {
 }
 
 // PersistenTiki Tiki 持久化
-func PersistenTiki(projectID, fileToken string) (err error) {
+func PersistenTiki(projectID, fileToken string) {
 	var data []byte
+	var err error
 	data, err = post(APIDomain+"save", map[string]interface{}{
 		"xauth": XAuth,
 		"token": fileToken,
@@ -58,14 +59,12 @@ func PersistenTiki(projectID, fileToken string) (err error) {
 	})
 
 	if err != nil {
-		return err
+		log.Printf("persistence request api error: %s", err.Error())
 	}
 
 	t := &TokenResponse{}
 	json.Unmarshal(data, t)
 	if t.Code != 2201 {
-		err = errors.New(t.Msg)
-		return
+		log.Printf("persistence error: [%d]%s", t.Code, t.Msg)
 	}
-	return
 }

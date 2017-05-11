@@ -1,6 +1,7 @@
 package ot
 
 import (
+	"bytes"
 	"errors"
 	"log"
 )
@@ -17,43 +18,72 @@ type Changeset struct {
 // Apply changeset to text
 func (c *Changeset) Apply(content string) (newContent string, err error) {
 	var addenPointer, removenPointer, pointer uint = 0, 0, 0
-	var temp, nextPointer uint
+	var temp uint
+	// var nextPointer uint
 
 	// c.InputLength = uint(len(content))
 
-	lenOfOriginContent := len(content)
-	lenOfAdden := len(c.Adden)
+	// lenOfOriginContent := len(content)
+	// lenOfAdden := len(c.Adden)
+
+	log.Printf("%dcontent %s\n", len(content), content)
+	log.Printf("%dadden %s\n", len(c.Adden), c.Adden)
+	log.Printf("%dremoven %s\n", len(c.Removen), c.Removen)
+
+	var buf bytes.Buffer
 
 	for _, op := range c.OP {
 		switch op.Type {
 		case OPRetain:
 			temp = op.Length
-			nextPointer = pointer + temp
 			// bce
-			if pointer < 0 || int(pointer) > lenOfOriginContent || int(nextPointer) > lenOfOriginContent {
-				log.Printf("p%v loc%v np%v\n", pointer, lenOfOriginContent, nextPointer)
-				log.Printf("1%v 2%v 3%v\n", pointer < 0, int(pointer) > lenOfOriginContent, int(nextPointer) > lenOfOriginContent)
-				return "", errors.New("slice bounds out of range")
+			// if pointer < 0 || int(pointer) > lenOfOriginContent || int(nextPointer) > lenOfOriginContent {
+			// 	log.Printf("p%v loc%v np%v\n", pointer, lenOfOriginContent, nextPointer)
+			// 	log.Printf("1%v 2%v 3%v\n", pointer < 0, int(pointer) > lenOfOriginContent, int(nextPointer) > lenOfOriginContent)
+			// 	return "", errors.New("slice bounds out of range")
+			// }
+			// log.Printf("retain %s\n", content[pointer:nextPointer])
+			// buf.WriteString(content[pointer:nextPointer])
+			tempString, err := UTF8SubString(content, pointer, temp)
+			if err != nil {
+				return "", err
 			}
-			newContent += content[pointer:nextPointer]
+			buf.WriteString(tempString)
 			pointer += temp
 		case OPInsert:
 			temp = op.Length
-			nextPointer = addenPointer + temp
-			if addenPointer < 0 || int(addenPointer) > lenOfAdden || int(nextPointer) > lenOfAdden {
-				log.Printf("ap%v la%v np%v\n", addenPointer, lenOfAdden, nextPointer)
-				log.Printf("4%v 5%v 6%v\n", addenPointer < 0, int(addenPointer) > lenOfAdden, int(nextPointer) > lenOfAdden)
-				return "", errors.New("slice bounds out of range")
+			// nextPointer = addenPointer + temp
+			// if addenPointer < 0 || int(addenPointer) > lenOfAdden || int(nextPointer) > lenOfAdden {
+			// 	log.Printf("ap%v la%v np%v\n", addenPointer, lenOfAdden, nextPointer)
+			// 	log.Printf("4%v 5%v 6%v\n", addenPointer < 0, int(addenPointer) > lenOfAdden, int(nextPointer) > lenOfAdden)
+			// 	return "", errors.New("slice bounds out of range")
+			// }
+			// log.Printf("[%d:%d]add %s\n", addenPointer, nextPointer, c.Adden[addenPointer:nextPointer])
+			// buf.WriteString(c.Adden[addenPointer:nextPointer])
+			tempString, err := UTF8SubString(c.Adden, addenPointer, temp)
+			if err != nil {
+				return "", err
 			}
-			newContent += c.Adden[addenPointer:nextPointer]
+			buf.WriteString(tempString)
 			addenPointer += temp
 		case OPDelete:
 			temp = op.Length
-			if pointer < 0 || int(pointer+temp) > lenOfOriginContent-1 || removenPointer < 0 || int(removenPointer+temp) > len(c.Removen)-1 {
-				log.Printf("7%v 8%v 9%v 10%v \n", pointer < 0, int(pointer+temp) > lenOfOriginContent-1, removenPointer < 0, int(removenPointer+temp) > len(c.Removen)-1)
-				return "", errors.New("slice bounds out of range")
+			// if pointer < 0 || int(pointer+temp) > lenOfOriginContent || removenPointer < 0 || int(removenPointer+temp) > len(c.Removen) {
+			// 	log.Printf("7%v 8%v 9%v 10%v \n", pointer < 0, int(pointer+temp) > lenOfOriginContent, removenPointer < 0, int(removenPointer+temp) > len(c.Removen))
+			// 	return "", errors.New("slice bounds out of range")
+			// }
+			// log.Printf("delete %s\n", content[pointer:pointer+temp])
+			originContent, err := UTF8SubString(content, pointer, temp)
+			if err != nil {
+				return "", err
 			}
-			if content[pointer:pointer+temp] == c.Removen[removenPointer:removenPointer+temp] {
+			removenContent, err := UTF8SubString(c.Removen, removenPointer, temp)
+			if err != nil {
+				return "", err
+			}
+
+			// if content[pointer:pointer+temp] == c.Removen[removenPointer:removenPointer+temp] {
+			if originContent == removenContent {
 				pointer += temp
 				removenPointer += temp
 			} else {
@@ -62,10 +92,17 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 		}
 	}
 	if pointer < uint(len(content)) {
-		newContent += content[pointer:]
+		tempString, err := UTF8SubString(content, pointer, 0)
+		if err != nil {
+			return "", err
+		}
+		// buf.WriteString(content[pointer:])
+		buf.WriteString(tempString)
 	}
 
-	c.OutputLength = uint(len(newContent))
+	newContent = buf.String()
+	c.OutputLength = uint(UTF8RealLength(newContent))
+
 	return
 }
 

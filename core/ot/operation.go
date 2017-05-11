@@ -12,10 +12,11 @@ const (
 )
 
 type Operation struct {
-	Type   uint `json:"type"`
-	Length uint `json:"length"`
-	Input  uint `json:"input"`
-	Output uint `json:"output"`
+	Type    uint   `json:"type"`
+	Length  uint   `json:"length"`
+	Input   uint   `json:"input"`
+	Output  uint   `json:"output"`
+	Content string `json:"content"`
 }
 
 // NewDelete return delete instance
