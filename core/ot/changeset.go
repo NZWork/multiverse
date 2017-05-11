@@ -17,34 +17,19 @@ type Changeset struct {
 
 // Apply changeset to text
 func (c *Changeset) Apply(content string) (newContent string, err error) {
-	var addenPointer, removenPointer, pointer uint = 0, 0, 0
-	var temp uint
-	// var nextPointer uint
+	var (
+		addenPointer, removenPointer, pointer, temp uint
+		buf                                         bytes.Buffer
+		op                                          Operation
+		tempString, tempString1                     string
+	)
 
-	// c.InputLength = uint(len(content))
-
-	// lenOfOriginContent := len(content)
-	// lenOfAdden := len(c.Adden)
-
-	log.Printf("%dcontent %s\n", len(content), content)
-	log.Printf("%dadden %s\n", len(c.Adden), c.Adden)
-	log.Printf("%dremoven %s\n", len(c.Removen), c.Removen)
-
-	var buf bytes.Buffer
-
-	for _, op := range c.OP {
+	for _, op = range c.OP {
 		switch op.Type {
 		case OPRetain:
 			temp = op.Length
 			// bce
-			// if pointer < 0 || int(pointer) > lenOfOriginContent || int(nextPointer) > lenOfOriginContent {
-			// 	log.Printf("p%v loc%v np%v\n", pointer, lenOfOriginContent, nextPointer)
-			// 	log.Printf("1%v 2%v 3%v\n", pointer < 0, int(pointer) > lenOfOriginContent, int(nextPointer) > lenOfOriginContent)
-			// 	return "", errors.New("slice bounds out of range")
-			// }
-			// log.Printf("retain %s\n", content[pointer:nextPointer])
-			// buf.WriteString(content[pointer:nextPointer])
-			tempString, err := UTF8SubString(content, pointer, temp)
+			tempString, err = UTF8SubString(content, pointer, temp)
 			if err != nil {
 				return "", err
 			}
@@ -52,15 +37,7 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 			pointer += temp
 		case OPInsert:
 			temp = op.Length
-			// nextPointer = addenPointer + temp
-			// if addenPointer < 0 || int(addenPointer) > lenOfAdden || int(nextPointer) > lenOfAdden {
-			// 	log.Printf("ap%v la%v np%v\n", addenPointer, lenOfAdden, nextPointer)
-			// 	log.Printf("4%v 5%v 6%v\n", addenPointer < 0, int(addenPointer) > lenOfAdden, int(nextPointer) > lenOfAdden)
-			// 	return "", errors.New("slice bounds out of range")
-			// }
-			// log.Printf("[%d:%d]add %s\n", addenPointer, nextPointer, c.Adden[addenPointer:nextPointer])
-			// buf.WriteString(c.Adden[addenPointer:nextPointer])
-			tempString, err := UTF8SubString(c.Adden, addenPointer, temp)
+			tempString, err = UTF8SubString(c.Adden, addenPointer, temp)
 			if err != nil {
 				return "", err
 			}
@@ -68,22 +45,16 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 			addenPointer += temp
 		case OPDelete:
 			temp = op.Length
-			// if pointer < 0 || int(pointer+temp) > lenOfOriginContent || removenPointer < 0 || int(removenPointer+temp) > len(c.Removen) {
-			// 	log.Printf("7%v 8%v 9%v 10%v \n", pointer < 0, int(pointer+temp) > lenOfOriginContent, removenPointer < 0, int(removenPointer+temp) > len(c.Removen))
-			// 	return "", errors.New("slice bounds out of range")
-			// }
-			// log.Printf("delete %s\n", content[pointer:pointer+temp])
-			originContent, err := UTF8SubString(content, pointer, temp)
+			tempString, err = UTF8SubString(content, pointer, temp)
 			if err != nil {
 				return "", err
 			}
-			removenContent, err := UTF8SubString(c.Removen, removenPointer, temp)
+			tempString1, err = UTF8SubString(c.Removen, removenPointer, temp)
 			if err != nil {
 				return "", err
 			}
 
-			// if content[pointer:pointer+temp] == c.Removen[removenPointer:removenPointer+temp] {
-			if originContent == removenContent {
+			if tempString == tempString1 {
 				pointer += temp
 				removenPointer += temp
 			} else {
@@ -91,12 +62,11 @@ func (c *Changeset) Apply(content string) (newContent string, err error) {
 			}
 		}
 	}
-	if pointer < uint(len(content)) {
-		tempString, err := UTF8SubString(content, pointer, 0)
+	if pointer < uint(UTF8RealLength(content)) {
+		tempString, err = UTF8SubString(content, pointer, 0)
 		if err != nil {
 			return "", err
 		}
-		// buf.WriteString(content[pointer:])
 		buf.WriteString(tempString)
 	}
 
@@ -126,8 +96,6 @@ func (c *Changeset) IntentionPreservation(pre *Changeset) (shouldForceSync bool)
 	var op1, op2 Operation
 	var tempOp1, tempOp2 Operation
 	var newStack []Operation
-
-	// var addenPtr, removenPtr int
 
 	debug := false
 
