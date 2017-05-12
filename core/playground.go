@@ -141,7 +141,7 @@ func (p *Playground) Run() {
 						// intention-preservation
 						log.Println("intention preservation")
 						m.Change.IntentionPreservation(&p.opHistory[m.Version].Change)
-						m.Version++
+						m.Version += 2
 						shouldChase = true
 					}
 
@@ -162,7 +162,6 @@ func (p *Playground) Run() {
 					if err != nil {
 						log.Println(err)
 					}
-					m.Version++
 					p.Tiki.Version = m.Version
 
 					msg, _ = m.ToJSON()
